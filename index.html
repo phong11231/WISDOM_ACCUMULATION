@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Học Qua Video — Lồng Tiếng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{
+    --bg:#eef1fb; --surface:#fff; --surface-2:#f4f6fd; --ink:#1b1f2a; --muted:#5c6476; --faint:#9299ab;
+    --border:#e3e7f3; --border-strong:#cfd5e6; --accent:#4b53d8; --accent-soft:#e7e9fc; --accent-ink:#3a40b8;
+    --head:linear-gradient(135deg,#5b63ec,#6b4fe0); --good:#0f9d8f; --warn:#d7820f; --danger:#e5484d;
+    --shadow:0 1px 2px rgba(40,46,90,.06),0 6px 16px rgba(40,46,90,.08);
+    --shadow-lift:0 3px 8px rgba(40,46,90,.12),0 12px 28px rgba(40,46,90,.14);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1218; --surface:#161b24; --surface-2:#1c222d; --ink:#eef0f6; --muted:#9aa2b4; --faint:#6a7384;
+    --border:#28303f; --border-strong:#3a4356; --accent:#8b93f6; --accent-soft:#222848; --accent-ink:#aeb4ff;
+    --head:linear-gradient(135deg,#3a4194,#4a3d8f); --good:#2bbcae; --warn:#e8a24e; --danger:#ff6b6e;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 22px rgba(0,0,0,.45);
+    --shadow-lift:0 4px 12px rgba(0,0,0,.5),0 18px 40px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Be Vietnam Pro",system-ui,sans-serif;line-height:1.5}
+  button,input,textarea,select{font-family:inherit}
+  .app{display:flex;flex-direction:column;height:100vh}
+
+  header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow)}
+  header h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-.02em;background:var(--head);-webkit-background-clip:text;background-clip:text;color:transparent}
+  header .sp{flex:1}
+  .iconbtn{width:38px;height:38px;display:grid;place-items:center;font-size:15px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+  .iconbtn:hover{border-color:var(--accent)}
+
+  .body{display:flex;flex:1;min-height:0}
+  /* Sidebar */
+  .side{width:300px;min-width:260px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+  .side-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;gap:8px}
+  .btn{font-size:13.5px;font-weight:700;cursor:pointer;border-radius:10px;padding:9px 13px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+  .btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.primary:hover{color:#fff;filter:brightness(1.06)}
+  .btn.sm{padding:6px 10px;font-size:12px;border-radius:8px}
+  .btn.block{width:100%;justify-content:center;text-align:center}
+  .tree{flex:1;overflow-y:auto;padding:8px}
+  .folder{margin-bottom:6px;border:1px solid var(--border);border-radius:11px;overflow:hidden;background:var(--surface-2)}
+  .folder-head{display:flex;align-items:center;gap:7px;padding:9px 11px;cursor:pointer;font-weight:700;font-size:13.5px}
+  .folder-head .caret{font-size:10px;color:var(--faint);transition:transform .15s}
+  .folder.collapsed .caret{transform:rotate(-90deg)}
+  .folder.collapsed .lessons{display:none}
+  .folder-head .fcount{color:var(--faint);font-weight:500;font-size:12px}
+  .folder-head .x{margin-left:auto;opacity:0;color:var(--faint);border:none;background:none;cursor:pointer;font-size:14px}
+  .folder-head:hover .x{opacity:1}
+  .lessons{padding:4px 8px 8px}
+  .lesson{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px}
+  .lesson:hover{background:var(--accent-soft)}
+  .lesson.active{background:var(--accent);color:#fff}
+  .lesson .dot{width:7px;height:7px;border-radius:50%;background:var(--good);flex:none}
+  .lesson .lname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lesson .x{opacity:0;border:none;background:none;color:inherit;cursor:pointer;font-size:13px}
+  .lesson:hover .x{opacity:.7}
+  .addbtn{margin-top:4px}
+  .empty-tree{color:var(--faint);font-size:13px;text-align:center;padding:24px 10px}
+
+  /* Main */
+  .main{flex:1;overflow-y:auto;padding:clamp(14px,2vw,26px);min-width:0}
+  .empty-main{height:100%;display:grid;place-items:center;color:var(--faint);text-align:center}
+  .empty-main .big{font-size:40px;margin-bottom:10px}
+  .lesson-title{font-size:clamp(18px,2.4vw,24px);font-weight:800;letter-spacing:-.02em;margin:0 0 14px}
+  .player-wrap{position:relative;width:100%;max-width:1000px;aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden;box-shadow:var(--shadow-lift)}
+  .player-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0;max-width:1000px}
+  .toggle{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;user-select:none}
+  .switch{width:44px;height:25px;border-radius:999px;background:var(--border-strong);position:relative;transition:background .15s}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .toggle.on .switch{background:var(--good)} .toggle.on .switch::after{left:22px}
+  .rate{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
+  .rate input{width:120px}
+  .status{font-size:13px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:7px}
+  .status .pbar{width:120px;height:9px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);overflow:hidden}
+  .status .pfill{height:100%;width:0;background:linear-gradient(90deg,var(--good),var(--accent));transition:width .2s}
+
+  .subbox{max-width:1000px;margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);min-height:96px}
+  .sub-vi{font-size:clamp(18px,2.2vw,24px);font-weight:700;line-height:1.35;letter-spacing:-.01em}
+  .sub-vi:empty::before{content:"— lời thoại tiếng Việt hiện ở đây —";color:var(--faint);font-weight:500;font-size:15px}
+  .sub-en{font-size:14px;color:var(--muted);margin-top:8px;font-style:italic}
+
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(10,12,20,.55);display:grid;place-items:center;padding:20px;z-index:50}
+  .modal{width:100%;max-width:460px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow-lift);padding:22px 22px}
+  .modal h3{margin:0 0 16px;font-size:18px;font-weight:800}
+  .modal label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin:0 0 5px}
+  .modal input,.modal textarea{width:100%;font-size:14px;padding:10px 12px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--ink);margin-bottom:14px}
+  .modal textarea{resize:vertical;min-height:120px;font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.5}
+  .modal input:focus,.modal textarea:focus{outline:2px solid var(--accent);border-color:var(--accent)}
+  .modal .frow{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
+  .filehint{font-size:12px;color:var(--faint);margin:-8px 0 14px}
+
+  @media(max-width:760px){
+    .body{flex-direction:column}
+    .side{width:auto;max-height:42vh;border-right:none;border-bottom:1px solid var(--border)}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🎬 Học Qua Video</h1>
+    <span style="font-size:12px;color:var(--faint)">Lồng tiếng Việt tự động từ phụ đề</span>
+    <span class="sp"></span>
+    <button class="iconbtn" id="theme" title="Sáng / Tối">☀️</button>
+  </header>
+
+  <div class="body">
+    <aside class="side">
+      <div class="side-head">
+        <button class="btn primary block" id="addFolder">＋ Thư mục</button>
+        <button class="iconbtn" id="exportBtn" title="Lưu ra file" style="flex:none">⬇</button>
+        <button class="iconbtn" id="importBtn" title="Nạp từ file" style="flex:none">⬆</button>
+        <input type="file" id="importFile" accept="application/json" hidden>
+      </div>
+      <div class="tree" id="tree"></div>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="empty-main" id="emptyMain">
+        <div>
+          <div class="big">📚</div>
+          <div style="font-weight:700;font-size:16px;color:var(--ink)">Chưa có bài học nào</div>
+          <div style="margin-top:6px">Bấm <b>＋ Thư mục</b> → thêm bài (link YouTube + phụ đề SRT)</div>
+        </div>
+      </div>
+      <div id="lessonView" hidden>
+        <h2 class="lesson-title" id="lTitle"></h2>
+        <div class="player-wrap"><div id="player"></div></div>
+        <div class="toolbar">
+          <div class="toggle on" id="dubToggle"><span class="switch"></span><span>Lồng tiếng</span></div>
+          <div class="rate">Tốc độ đọc <input type="range" id="rate" min="0.8" max="1.8" step="0.05" value="1.15"><span id="rateVal">1.15x</span></div>
+          <span class="status" id="status"></span>
+        </div>
+        <div class="subbox">
+          <div class="sub-vi" id="subVi"></div>
+          <div class="sub-en" id="subEn"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Add lesson modal -->
+<div class="overlay" id="lessonModal" hidden>
+  <div class="modal">
+    <h3>Thêm bài học</h3>
+    <label>Tên bài</label>
+    <input id="mName" placeholder="VD: Bài 1 — Introduction">
+    <label>Link YouTube</label>
+    <input id="mUrl" placeholder="https://www.youtube.com/watch?v=...">
+    <label>Phụ đề SRT (tiếng Anh)</label>
+    <input type="file" id="mFile" accept=".srt,.vtt,.txt" style="padding:7px">
+    <p class="filehint">Chọn file .srt, hoặc dán nội dung bên dưới ↓</p>
+    <textarea id="mSrt" placeholder="1&#10;00:00:01,000 --> 00:00:04,000&#10;Hello everyone..."></textarea>
+    <div class="frow">
+      <button class="btn" id="mCancel">Hủy</button>
+      <button class="btn primary" id="mSave">Thêm bài</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+(function(){
+  "use strict";
+  var NS="dubhoc:";
+  var $=function(id){return document.getElementById(id);};
+
+  /* ---------- theme ---------- */
+  function applyTheme(t){document.documentElement.setAttribute("data-theme",t);$("theme").textContent=(t==="dark"?"🌙":"☀️");}
+  var st; try{st=localStorage.getItem(NS+"theme");}catch(e){}
+  applyTheme(st||"light");
+  $("theme").onclick=function(){var c=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";applyTheme(c);try{localStorage.setItem(NS+"theme",c);}catch(e){}};
+
+  /* ---------- data ---------- */
+  var data={folders:[]};
+  try{var r=localStorage.getItem(NS+"data"); if(r)data=JSON.parse(r);}catch(e){}
+  function save(){try{localStorage.setItem(NS+"data",JSON.stringify(data));}catch(e){}}
+  function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+  /* ---------- helpers ---------- */
+  function getVideoId(url){var m=(url||"").match(/(?:youtu\.be\/|v=|\/embed\/|\/shorts\/|\/live\/)([A-Za-z0-9_-]{11})/);return m?m[1]:"";}
+  function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+  function parseSRT(text){
+    var out=[]; if(!text)return out;
+    var blocks=text.replace(/\r/g,"").replace(/^WEBVTT.*?\n/,"").split(/\n\s*\n/);
+    blocks.forEach(function(b){
+      var lines=b.split("\n").filter(function(x){return x.trim()!=="";});
+      var ti=-1;
+      for(var i=0;i<lines.length;i++){if(/-->/.test(lines[i])){ti=i;break;}}
+      if(ti<0)return;
+      var m=lines[ti].match(/(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3})\s*-->\s*(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3})/);
+      if(!m)return;
+      var s=(+m[1])*3600+(+m[2])*60+(+m[3])+(+m[4])/1000;
+      var e=(+m[5])*3600+(+m[6])*60+(+m[7])+(+m[8])/1000;
+      var txt=lines.slice(ti+1).join(" ").replace(/<[^>]+>/g,"").trim();
+      if(txt)out.push({start:s,end:e,en:txt,vi:""});
+    });
+    out.sort(function(a,b){return a.start-b.start;});
+    return out;
+  }
+
+  /* ---------- translation (Google free -> MyMemory fallback) ---------- */
+  async function translateText(text){
+    if(!text)return "";
+    try{
+      var u="https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q="+encodeURIComponent(text);
+      var res=await fetch(u);
+      if(res.ok){var d=await res.json(); if(d&&d[0]){return d[0].map(function(x){return x[0];}).join("");}}
+    }catch(e){}
+    try{
+      var r2=await fetch("https://api.mymemory.translated.net/get?q="+encodeURIComponent(text)+"&langpair=en|vi");
+      var d2=await r2.json(); if(d2&&d2.responseData&&d2.responseData.translatedText)return d2.responseData.translatedText;
+    }catch(e){}
+    return text;
+  }
+  async function translateCues(cues,onP){
+    for(var i=0;i<cues.length;i++){
+      if(cues[i].vi){onP(i+1,cues.length);continue;}
+      cues[i].vi=await translateText(cues[i].en);
+      onP(i+1,cues.length);
+      await sleep(70);
+    }
+  }
+
+  /* ---------- TTS ---------- */
+  var viVoice=null;
+  function loadVoices(){try{var vs=speechSynthesis.getVoices();viVoice=vs.filter(function(v){return /^vi/i.test(v.lang);})[0]||null;}catch(e){}}
+  if("speechSynthesis" in window){speechSynthesis.onvoiceschanged=loadVoices;loadVoices();}
+  function speak(text){
+    if(!text||!("speechSynthesis" in window))return;
+    var u=new SpeechSynthesisUtterance(text);
+    u.lang="vi-VN"; if(viVoice)u.voice=viVoice;
+    u.rate=parseFloat($("rate").value)||1.15;
+    speechSynthesis.speak(u);
+  }
+
+  /* ---------- YouTube player ---------- */
+  var player=null, ytReady=false, pendingVideo=null;
+  window.onYouTubeIframeAPIReady=function(){ ytReady=true; if(pendingVideo){createPlayer(pendingVideo);pendingVideo=null;} };
+  function createPlayer(vid){
+    if(!ytReady){pendingVideo=vid;return;}
+    if(player){player.loadVideoById(vid);return;}
+    player=new YT.Player("player",{videoId:vid,playerVars:{rel:0,modestbranding:1},
+      events:{onReady:onPReady,onStateChange:onPState}});
+  }
+  function onPReady(){ if(dubbingOn)player.mute(); }
+  function onPState(ev){
+    // 1=playing 2=paused 0=ended 3=buffering
+    if(ev.data===2||ev.data===0){ speechSynthesis.cancel(); lastIdx=-99; }
+  }
+
+  /* ---------- sync engine ---------- */
+  var curCues=[], lastIdx=-1, dubbingOn=true, loopTimer=null;
+  function cueIndexAt(t){ for(var i=0;i<curCues.length;i++){ if(t>=curCues[i].start && t<curCues[i].end) return i; } return -1; }
+  function startLoop(){
+    stopLoop();
+    loopTimer=setInterval(function(){
+      if(!player||!player.getCurrentTime||!dubbingOn)return;
+      var ps; try{ps=player.getPlayerState();}catch(e){return;}
+      if(ps!==1){return;} // only while playing
+      var t=player.getCurrentTime();
+      var idx=cueIndexAt(t);
+      if(idx!==lastIdx){
+        lastIdx=idx;
+        speechSynthesis.cancel();
+        if(idx>=0){ speak(curCues[idx].vi); renderSub(idx); } else { renderSub(-1); }
+      }
+    },150);
+  }
+  function stopLoop(){ if(loopTimer){clearInterval(loopTimer);loopTimer=null;} }
+  function renderSub(idx){
+    if(idx<0){ $("subVi").textContent=""; $("subEn").textContent=""; return; }
+    $("subVi").textContent=curCues[idx].vi||"";
+    $("subEn").textContent=curCues[idx].en||"";
+  }
+
+  /* ---------- dub toggle & rate ---------- */
+  $("dubToggle").onclick=function(){
+    dubbingOn=!dubbingOn;
+    this.classList.toggle("on",dubbingOn);
+    if(player&&player.mute){ if(dubbingOn)player.mute(); else player.unMute(); }
+    if(!dubbingOn){ speechSynthesis.cancel(); } else { lastIdx=-99; }
+  };
+  $("rate").oninput=function(){ $("rateVal").textContent=parseFloat(this.value).toFixed(2)+"x"; };
+
+  /* ---------- open lesson ---------- */
+  var activeLesson=null;
+  function setStatus(txt,cur,total){
+    var s=$("status");
+    if(cur!=null){ s.innerHTML=txt+' <span class="pbar"><span class="pfill" style="width:'+Math.round(cur/total*100)+'%"></span></span> '+cur+"/"+total; }
+    else { s.textContent=txt; }
+  }
+  async function openLesson(fid,lid){
+    var folder=data.folders.find(function(f){return f.id===fid;}); if(!folder)return;
+    var lesson=folder.lessons.find(function(l){return l.id===lid;}); if(!lesson)return;
+    activeLesson={fid:fid,lid:lid};
+    renderTree();
+    $("emptyMain").hidden=true; $("lessonView").hidden=false;
+    $("lTitle").textContent=lesson.name;
+    $("subVi").textContent=""; $("subEn").textContent="";
+    speechSynthesis.cancel(); stopLoop(); lastIdx=-1;
+
+    var vid=lesson.videoId||getVideoId(lesson.url);
+    if(!vid){ setStatus("⚠️ Link YouTube không hợp lệ"); return; }
+    createPlayer(vid);
+
+    curCues=parseSRT(lesson.srt||"");
+    if(curCues.length===0){ setStatus("⚠️ Không có phụ đề — chỉ xem video"); return; }
+
+    // restore cached translations onto fresh cues (match by index+time)
+    if(lesson.cues && lesson.cues.length===curCues.length){
+      for(var i=0;i<curCues.length;i++){ if(lesson.cues[i].vi) curCues[i].vi=lesson.cues[i].vi; }
+    }
+    var need=curCues.some(function(c){return !c.vi;});
+    if(need){
+      setStatus("Đang dịch…",0,curCues.length);
+      await translateCues(curCues,function(cur,total){ setStatus("Đang dịch…",cur,total); });
+      lesson.cues=curCues.map(function(c){return {start:c.start,end:c.end,en:c.en,vi:c.vi};});
+      save();
+    }
+    setStatus("✅ Sẵn sàng — đang lồng tiếng");
+    if(dubbingOn&&player&&player.mute)player.mute();
+    startLoop();
+    try{ player.playVideo(); }catch(e){}
+  }
+
+  /* ---------- render tree ---------- */
+  function renderTree(){
+    var tree=$("tree"); tree.innerHTML="";
+    if(data.folders.length===0){ tree.innerHTML='<div class="empty-tree">Chưa có thư mục.<br>Bấm ＋ Thư mục để bắt đầu.</div>'; return; }
+    data.folders.forEach(function(f){
+      var fo=document.createElement("div"); fo.className="folder"+(f.collapsed?" collapsed":"");
+      var fh=document.createElement("div"); fh.className="folder-head";
+      fh.innerHTML='<span class="caret">▼</span><span>📁 '+esc(f.name)+'</span><span class="fcount">('+f.lessons.length+')</span><button class="x" title="Xóa thư mục">✕</button>';
+      fh.onclick=function(ev){ if(ev.target.classList.contains("x"))return; f.collapsed=!f.collapsed; save(); renderTree(); };
+      fh.querySelector(".x").onclick=function(ev){ ev.stopPropagation(); if(confirm('Xóa thư mục "'+f.name+'" và tất cả bài trong đó?')){ data.folders=data.folders.filter(function(x){return x!==f;}); save(); renderTree(); } };
+      fo.appendChild(fh);
+      var ls=document.createElement("div"); ls.className="lessons";
+      f.lessons.forEach(function(l){
+        var le=document.createElement("div");
+        le.className="lesson"+(activeLesson&&activeLesson.fid===f.id&&activeLesson.lid===l.id?" active":"");
+        le.innerHTML='<span class="dot"></span><span class="lname">'+esc(l.name)+'</span><button class="x" title="Xóa bài">✕</button>';
+        le.onclick=function(ev){ if(ev.target.classList.contains("x"))return; openLesson(f.id,l.id); };
+        le.querySelector(".x").onclick=function(ev){ ev.stopPropagation(); if(confirm('Xóa bài "'+l.name+'"?')){ f.lessons=f.lessons.filter(function(x){return x!==l;}); save(); renderTree(); } };
+        ls.appendChild(le);
+      });
+      var add=document.createElement("button"); add.className="btn sm block addbtn"; add.textContent="＋ Bài học";
+      add.onclick=function(){ openLessonModal(f.id); };
+      ls.appendChild(add);
+      fo.appendChild(ls);
+      tree.appendChild(fo);
+    });
+  }
+  function esc(s){return (s||"").replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+
+  /* ---------- add folder / lesson ---------- */
+  $("addFolder").onclick=function(){
+    var name=prompt("Tên thư mục (VD: Khóa tiếng Anh, Khóa React...):"); if(!name)return; name=name.trim(); if(!name)return;
+    data.folders.push({id:uid(),name:name,collapsed:false,lessons:[]}); save(); renderTree();
+  };
+  var modalFid=null;
+  function openLessonModal(fid){ modalFid=fid; $("mName").value=""; $("mUrl").value=""; $("mSrt").value=""; $("mFile").value=""; $("lessonModal").hidden=false; $("mName").focus(); }
+  $("mCancel").onclick=function(){ $("lessonModal").hidden=true; };
+  $("mFile").onchange=function(){ var f=this.files[0]; if(!f)return; var rd=new FileReader(); rd.onload=function(){ $("mSrt").value=rd.result; }; rd.readAsText(f); };
+  $("mSave").onclick=function(){
+    var name=$("mName").value.trim(), url=$("mUrl").value.trim(), srt=$("mSrt").value;
+    if(!name){alert("Nhập tên bài.");return;}
+    var vid=getVideoId(url);
+    if(!vid){alert("Link YouTube không hợp lệ.");return;}
+    var folder=data.folders.find(function(f){return f.id===modalFid;}); if(!folder)return;
+    folder.lessons.push({id:uid(),name:name,url:url,videoId:vid,srt:srt,cues:null});
+    save(); renderTree(); $("lessonModal").hidden=true;
+  };
+
+  /* ---------- export / import ---------- */
+  $("exportBtn").onclick=function(){
+    var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="hoc-video-data.json"; a.click();
+  };
+  $("importBtn").onclick=function(){ $("importFile").click(); };
+  $("importFile").onchange=function(){ var f=this.files[0]; if(!f)return; var rd=new FileReader(); rd.onload=function(){ try{ var d=JSON.parse(rd.result); if(d&&d.folders){ data=d; save(); renderTree(); alert("Đã nạp dữ liệu."); } }catch(e){ alert("File không hợp lệ."); } }; rd.readAsText(f); };
+
+  renderTree();
+})();
+</script>
+</body>
+</html>
