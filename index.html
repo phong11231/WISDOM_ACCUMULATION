@@ -138,6 +138,7 @@
         <div class="toolbar">
           <div class="toggle on" id="dubToggle"><span class="switch"></span><span>Lồng tiếng</span></div>
           <div class="rate">Tốc độ đọc <input type="range" id="rate" min="0.8" max="1.8" step="0.05" value="1.15"><span id="rateVal">1.15x</span></div>
+          <label class="rate">Giọng <select id="voiceSel" style="max-width:200px;padding:6px 8px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--ink);font-size:12.5px"></select></label>
           <span class="status" id="status"></span>
         </div>
         <div class="subbox">
@@ -233,13 +234,33 @@
   }
 
   /* ---------- TTS ---------- */
-  var viVoice=null;
-  function loadVoices(){try{var vs=speechSynthesis.getVoices();viVoice=vs.filter(function(v){return /^vi/i.test(v.lang);})[0]||null;}catch(e){}}
-  if("speechSynthesis" in window){speechSynthesis.onvoiceschanged=loadVoices;loadVoices();}
+  var voices=[], selVoiceURI=null;
+  try{selVoiceURI=localStorage.getItem(NS+"voice");}catch(e){}
+  function populateVoices(){
+    if(!("speechSynthesis" in window))return;
+    voices=speechSynthesis.getVoices()||[];
+    var sel=$("voiceSel"); if(!sel)return; sel.innerHTML="";
+    var sorted=voices.slice().sort(function(a,b){
+      var av=/^vi/i.test(a.lang)?0:1, bv=/^vi/i.test(b.lang)?0:1;
+      if(av!==bv)return av-bv; return a.name.localeCompare(b.name);
+    });
+    if(sorted.length===0){ var o=document.createElement("option"); o.textContent="(trình duyệt chưa có giọng)"; sel.appendChild(o); return; }
+    sorted.forEach(function(v){
+      var o=document.createElement("option"); o.value=v.voiceURI;
+      o.textContent=(/^vi/i.test(v.lang)?"🇻🇳 ":"")+v.name+" ("+v.lang+")";
+      sel.appendChild(o);
+    });
+    var pick=null;
+    if(selVoiceURI) pick=voices.filter(function(v){return v.voiceURI===selVoiceURI;})[0];
+    if(!pick) pick=voices.filter(function(v){return /^vi/i.test(v.lang);})[0];
+    if(pick) sel.value=pick.voiceURI;
+  }
+  function currentVoice(){ var uri=$("voiceSel")?$("voiceSel").value:""; return voices.filter(function(v){return v.voiceURI===uri;})[0]||null; }
+  if("speechSynthesis" in window){ speechSynthesis.onvoiceschanged=populateVoices; populateVoices(); setTimeout(populateVoices,500); }
   function speak(text){
     if(!text||!("speechSynthesis" in window))return;
     var u=new SpeechSynthesisUtterance(text);
-    u.lang="vi-VN"; if(viVoice)u.voice=viVoice;
+    var v=currentVoice(); if(v){ u.voice=v; u.lang=v.lang; } else { u.lang="vi-VN"; }
     u.rate=parseFloat($("rate").value)||1.15;
     speechSynthesis.speak(u);
   }
@@ -249,11 +270,11 @@
   window.onYouTubeIframeAPIReady=function(){ ytReady=true; if(pendingVideo){createPlayer(pendingVideo);pendingVideo=null;} };
   function createPlayer(vid){
     if(!ytReady){pendingVideo=vid;return;}
-    if(player){player.loadVideoById(vid);return;}
-    player=new YT.Player("player",{videoId:vid,playerVars:{rel:0,modestbranding:1},
+    if(player){ try{player.loadVideoById(vid); if(dubbingOn)player.mute();}catch(e){} return; }
+    player=new YT.Player("player",{videoId:vid,playerVars:{rel:0,modestbranding:1,playsinline:1},
       events:{onReady:onPReady,onStateChange:onPState}});
   }
-  function onPReady(){ if(dubbingOn)player.mute(); }
+  function onPReady(){ if(dubbingOn)player.mute(); try{player.playVideo();}catch(e){} }
   function onPState(ev){
     // 1=playing 2=paused 0=ended 3=buffering
     if(ev.data===2||ev.data===0){ speechSynthesis.cancel(); lastIdx=-99; }
@@ -304,6 +325,7 @@
     var folder=data.folders.find(function(f){return f.id===fid;}); if(!folder)return;
     var lesson=folder.lessons.find(function(l){return l.id===lid;}); if(!lesson)return;
     activeLesson={fid:fid,lid:lid};
+    try{localStorage.setItem(NS+"active",JSON.stringify(activeLesson));}catch(e){}
     renderTree();
     $("emptyMain").hidden=true; $("lessonView").hidden=false;
     $("lTitle").textContent=lesson.name;
@@ -331,7 +353,7 @@
     setStatus("✅ Sẵn sàng — đang lồng tiếng");
     if(dubbingOn&&player&&player.mute)player.mute();
     startLoop();
-    try{ player.playVideo(); }catch(e){}
+    try{ if(player&&player.playVideo)player.playVideo(); }catch(e){}
   }
 
   /* ---------- render tree ---------- */
@@ -372,13 +394,21 @@
   function openLessonModal(fid){ modalFid=fid; $("mName").value=""; $("mUrl").value=""; $("mSrt").value=""; $("mFile").value=""; $("lessonModal").hidden=false; $("mName").focus(); }
   $("mCancel").onclick=function(){ $("lessonModal").hidden=true; };
   $("mFile").onchange=function(){ var f=this.files[0]; if(!f)return; var rd=new FileReader(); rd.onload=function(){ $("mSrt").value=rd.result; }; rd.readAsText(f); };
-  $("mSave").onclick=function(){
+  $("mSave").onclick=async function(){
     var name=$("mName").value.trim(), url=$("mUrl").value.trim(), srt=$("mSrt").value;
     if(!name){alert("Nhập tên bài.");return;}
     var vid=getVideoId(url);
     if(!vid){alert("Link YouTube không hợp lệ.");return;}
     var folder=data.folders.find(function(f){return f.id===modalFid;}); if(!folder)return;
-    folder.lessons.push({id:uid(),name:name,url:url,videoId:vid,srt:srt,cues:null});
+    var cues=parseSRT(srt);
+    var btn=this;
+    if(cues.length>0){
+      btn.disabled=true; $("mCancel").disabled=true;
+      await translateCues(cues,function(cur,total){ btn.textContent="Đang dịch… "+cur+"/"+total; });
+      btn.disabled=false; $("mCancel").disabled=false; btn.textContent="Thêm bài";
+    }
+    folder.lessons.push({id:uid(),name:name,url:url,videoId:vid,srt:srt,
+      cues:cues.map(function(c){return {start:c.start,end:c.end,en:c.en,vi:c.vi};})});
     save(); renderTree(); $("lessonModal").hidden=true;
   };
 
@@ -391,6 +421,7 @@
   $("importFile").onchange=function(){ var f=this.files[0]; if(!f)return; var rd=new FileReader(); rd.onload=function(){ try{ var d=JSON.parse(rd.result); if(d&&d.folders){ data=d; save(); renderTree(); alert("Đã nạp dữ liệu."); } }catch(e){ alert("File không hợp lệ."); } }; rd.readAsText(f); };
 
   renderTree();
+  try{ var la=JSON.parse(localStorage.getItem(NS+"active")||"null"); if(la&&la.fid&&la.lid) openLesson(la.fid,la.lid); }catch(e){}
 })();
 </script>
 </body>
