@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#eef1fb; --surface:#fff; --surface-2:#f4f6fd; --ink:#1b1f2a; --muted:#5c6476; --faint:#9299ab;
@@ -27,6 +30,19 @@
   body{margin:0;background:var(--bg);color:var(--ink);font-family:"Be Vietnam Pro",system-ui,sans-serif;line-height:1.5}
   button,input,textarea,select{font-family:inherit}
   .app{display:flex;flex-direction:column;height:100vh}
+  .center{position:fixed;inset:0;display:grid;place-items:center;padding:20px;background:var(--bg);z-index:100}
+  .loading{font-size:14px;color:var(--muted)}
+  .authcard{width:100%;max-width:390px;background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow-lift);padding:30px 28px}
+  .authcard .brand{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 8px}
+  .authcard h2{margin:0 0 5px;font-size:23px;font-weight:800}
+  .authcard .asub{margin:0 0 22px;font-size:13.5px;color:var(--muted)}
+  .authcard label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin:0 0 5px}
+  .authcard input{width:100%;font-size:14.5px;padding:11px 13px;border-radius:11px;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--ink);margin-bottom:15px}
+  .authcard input:focus{outline:2px solid var(--accent);border-color:var(--accent)}
+  .aerr{font-size:13px;color:var(--danger);margin:0 0 12px;font-weight:600}
+  .aerr:empty{display:none}
+  .arow{display:flex;gap:10px;margin-top:4px}.arow .btn{flex:1;justify-content:center;text-align:center}
+  .umail{font-size:13px;font-weight:700;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
   header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow)}
   header h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-.02em;background:var(--head);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -105,11 +121,30 @@
 </style>
 </head>
 <body>
-<div class="app">
+<div class="center" id="loadingView"><div class="loading">Đang tải…</div></div>
+<div class="center" id="authView" hidden>
+  <div class="authcard">
+    <p class="brand">🎬 Học Qua Video</p>
+    <h2>Đăng nhập</h2>
+    <p class="asub">Đăng nhập để lưu khóa học trên tài khoản — mở máy nào cũng thấy.</p>
+    <div class="aerr" id="aerr"></div>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" placeholder="ban@email.com">
+    <label for="pw">Mật khẩu</label>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="ít nhất 6 ký tự">
+    <div class="arow">
+      <button class="btn primary" id="loginBtn">Đăng nhập</button>
+      <button class="btn" id="signupBtn">Đăng ký</button>
+    </div>
+  </div>
+</div>
+<div class="app" hidden>
   <header>
     <h1>🎬 Học Qua Video</h1>
     <span style="font-size:12px;color:var(--faint)">Lồng tiếng Việt tự động từ phụ đề</span>
     <span class="sp"></span>
+    <span class="umail" id="userEmail"></span>
+    <button class="iconbtn" id="logout" title="Đăng xuất">⎋</button>
     <button class="iconbtn" id="theme" title="Sáng / Tối">☀️</button>
   </header>
 
@@ -138,7 +173,7 @@
         <div class="toolbar">
           <div class="toggle on" id="dubToggle"><span class="switch"></span><span>Lồng tiếng</span></div>
           <div class="rate">Tốc độ đọc <input type="range" id="rate" min="0.8" max="1.8" step="0.05" value="1.15"><span id="rateVal">1.15x</span></div>
-          <label class="rate">Giọng <select id="voiceSel" style="max-width:200px;padding:6px 8px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--ink);font-size:12.5px"></select></label>
+          <span class="rate">🔊 Giọng: Google Tiếng Việt</span>
           <span class="status" id="status"></span>
         </div>
         <div class="subbox">
@@ -182,10 +217,23 @@
   applyTheme(st||"light");
   $("theme").onclick=function(){var c=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";applyTheme(c);try{localStorage.setItem(NS+"theme",c);}catch(e){}};
 
+  /* ---------- Firebase ---------- */
+  var firebaseConfig={apiKey:"AIzaSyCdc-EQiFL6PB-7sm44U7mUu1OB5sRvGP0",authDomain:"lichchill-32fc5.firebaseapp.com",projectId:"lichchill-32fc5",storageBucket:"lichchill-32fc5.firebasestorage.app",messagingSenderId:"537593679634",appId:"1:537593679634:web:364051f0d9c6fb0e9b2dcb"};
+  firebase.initializeApp(firebaseConfig);
+  var fbauth=firebase.auth(), db=firebase.firestore(), AUID=null;
+  function docRef(){ return db.collection("users").doc(AUID).collection("app").doc("courses"); }
+
   /* ---------- data ---------- */
   var data={folders:[]};
-  try{var r=localStorage.getItem(NS+"data"); if(r)data=JSON.parse(r);}catch(e){}
-  function save(){try{localStorage.setItem(NS+"data",JSON.stringify(data));}catch(e){}}
+  var saveTimer;
+  function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(function(){ if(!AUID)return; docRef().set({folders:data.folders}).catch(function(e){console.error("save",e);}); },500); }
+  function loadData(){
+    return docRef().get().then(function(s){
+      if(s.exists && s.data().folders){ data={folders:s.data().folders}; return; }
+      try{ var r=localStorage.getItem(NS+"data"); if(r){ var d=JSON.parse(r); if(d&&d.folders&&d.folders.length){ data=d; docRef().set({folders:data.folders}); return; } } }catch(e){}
+      data={folders:[]};
+    }).catch(function(e){ console.warn("load",e); data={folders:[]}; });
+  }
   function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 
   /* ---------- helpers ---------- */
@@ -233,36 +281,15 @@
     }
   }
 
-  /* ---------- TTS ---------- */
-  var voices=[], selVoiceURI=null;
-  try{selVoiceURI=localStorage.getItem(NS+"voice");}catch(e){}
-  function populateVoices(){
-    if(!("speechSynthesis" in window))return;
-    voices=speechSynthesis.getVoices()||[];
-    var sel=$("voiceSel"); if(!sel)return; sel.innerHTML="";
-    var sorted=voices.slice().sort(function(a,b){
-      var av=/^vi/i.test(a.lang)?0:1, bv=/^vi/i.test(b.lang)?0:1;
-      if(av!==bv)return av-bv; return a.name.localeCompare(b.name);
-    });
-    if(sorted.length===0){ var o=document.createElement("option"); o.textContent="(trình duyệt chưa có giọng)"; sel.appendChild(o); return; }
-    sorted.forEach(function(v){
-      var o=document.createElement("option"); o.value=v.voiceURI;
-      o.textContent=(/^vi/i.test(v.lang)?"🇻🇳 ":"")+v.name+" ("+v.lang+")";
-      sel.appendChild(o);
-    });
-    var pick=null;
-    if(selVoiceURI) pick=voices.filter(function(v){return v.voiceURI===selVoiceURI;})[0];
-    if(!pick) pick=voices.filter(function(v){return /^vi/i.test(v.lang);})[0];
-    if(pick) sel.value=pick.voiceURI;
-  }
-  function currentVoice(){ var uri=$("voiceSel")?$("voiceSel").value:""; return voices.filter(function(v){return v.voiceURI===uri;})[0]||null; }
-  if("speechSynthesis" in window){ speechSynthesis.onvoiceschanged=populateVoices; populateVoices(); setTimeout(populateVoices,500); }
+  /* ---------- TTS: Google Translate TTS (giọng Việt thật, free, không cần cài) ---------- */
+  var curAudio=null;
+  var TTS_PROXY="https://edge-tts-api-gold.vercel.app/api/gtts";
+  function ttsUrl(text){ return TTS_PROXY+"?lang=vi&text="+encodeURIComponent((text||"").slice(0,200)); }
+  function stopSpeak(){ if(curAudio){try{curAudio.pause();}catch(e){} curAudio=null;} if("speechSynthesis" in window){try{speechSynthesis.cancel();}catch(e){}} }
   function speak(text){
-    if(!text||!("speechSynthesis" in window))return;
-    var u=new SpeechSynthesisUtterance(text);
-    var v=currentVoice(); if(v){ u.voice=v; u.lang=v.lang; } else { u.lang="vi-VN"; }
-    u.rate=parseFloat($("rate").value)||1.15;
-    speechSynthesis.speak(u);
+    if(!text)return;
+    stopSpeak();
+    try{ var a=new Audio(ttsUrl(text)); a.playbackRate=parseFloat($("rate").value)||1.15; curAudio=a; a.play().catch(function(){}); }catch(e){}
   }
 
   /* ---------- YouTube player ---------- */
@@ -277,7 +304,7 @@
   function onPReady(){ if(dubbingOn)player.mute(); try{player.playVideo();}catch(e){} }
   function onPState(ev){
     // 1=playing 2=paused 0=ended 3=buffering
-    if(ev.data===2||ev.data===0){ speechSynthesis.cancel(); lastIdx=-99; }
+    if(ev.data===2||ev.data===0){ stopSpeak(); lastIdx=-99; }
   }
 
   /* ---------- sync engine ---------- */
@@ -293,7 +320,7 @@
       var idx=cueIndexAt(t);
       if(idx!==lastIdx){
         lastIdx=idx;
-        speechSynthesis.cancel();
+        stopSpeak();
         if(idx>=0){ speak(curCues[idx].vi); renderSub(idx); } else { renderSub(-1); }
       }
     },150);
@@ -310,7 +337,7 @@
     dubbingOn=!dubbingOn;
     this.classList.toggle("on",dubbingOn);
     if(player&&player.mute){ if(dubbingOn)player.mute(); else player.unMute(); }
-    if(!dubbingOn){ speechSynthesis.cancel(); } else { lastIdx=-99; }
+    if(!dubbingOn){ stopSpeak(); } else { lastIdx=-99; }
   };
   $("rate").oninput=function(){ $("rateVal").textContent=parseFloat(this.value).toFixed(2)+"x"; };
 
@@ -330,7 +357,7 @@
     $("emptyMain").hidden=true; $("lessonView").hidden=false;
     $("lTitle").textContent=lesson.name;
     $("subVi").textContent=""; $("subEn").textContent="";
-    speechSynthesis.cancel(); stopLoop(); lastIdx=-1;
+    stopSpeak(); stopLoop(); lastIdx=-1;
 
     var vid=lesson.videoId||getVideoId(lesson.url);
     if(!vid){ setStatus("⚠️ Link YouTube không hợp lệ"); return; }
@@ -420,8 +447,41 @@
   $("importBtn").onclick=function(){ $("importFile").click(); };
   $("importFile").onchange=function(){ var f=this.files[0]; if(!f)return; var rd=new FileReader(); rd.onload=function(){ try{ var d=JSON.parse(rd.result); if(d&&d.folders){ data=d; save(); renderTree(); alert("Đã nạp dữ liệu."); } }catch(e){ alert("File không hợp lệ."); } }; rd.readAsText(f); };
 
-  renderTree();
-  try{ var la=JSON.parse(localStorage.getItem(NS+"active")||"null"); if(la&&la.fid&&la.lid) openLesson(la.fid,la.lid); }catch(e){}
+  /* ---------- auth ---------- */
+  function authErr(e){
+    var c=(e&&e.code)||"";
+    if(c.indexOf("invalid-email")>=0)return "Email không hợp lệ.";
+    if(c.indexOf("weak-password")>=0||c.indexOf("missing-password")>=0)return "Mật khẩu phải từ 6 ký tự.";
+    if(c.indexOf("email-already-in-use")>=0)return "Email này đã có tài khoản — bấm Đăng nhập.";
+    if(c.indexOf("invalid-credential")>=0||c.indexOf("wrong-password")>=0||c.indexOf("user-not-found")>=0)return "Sai email hoặc mật khẩu.";
+    if(c.indexOf("configuration-not-found")>=0||c.indexOf("operation-not-allowed")>=0)return "Chưa bật Email/Password trong Firebase.";
+    if(c.indexOf("unauthorized-domain")>=0)return "Tên miền chưa được cấp phép trong Firebase.";
+    return (e&&e.message)||"Có lỗi, thử lại.";
+  }
+  function doAuth(mode){
+    var em=$("email").value.trim(), pw=$("pw").value, err=$("aerr"); err.textContent="";
+    if(!em||!pw){err.textContent="Nhập email và mật khẩu.";return;}
+    var p=mode==="signup"?fbauth.createUserWithEmailAndPassword(em,pw):fbauth.signInWithEmailAndPassword(em,pw);
+    p.catch(function(e){err.textContent=authErr(e);});
+  }
+  $("loginBtn").onclick=function(){doAuth("login");};
+  $("signupBtn").onclick=function(){doAuth("signup");};
+  $("pw").addEventListener("keydown",function(e){if(e.key==="Enter")doAuth("login");});
+  $("logout").onclick=function(){ try{stopSpeak();stopLoop();}catch(e){} fbauth.signOut(); };
+
+  fbauth.onAuthStateChanged(function(user){
+    $("loadingView").hidden=true;
+    if(user){
+      AUID=user.uid; $("userEmail").textContent=user.email;
+      $("authView").hidden=true; document.querySelector(".app").hidden=false;
+      loadData().then(function(){
+        renderTree();
+        try{ var la=JSON.parse(localStorage.getItem(NS+"active")||"null"); if(la&&la.fid&&la.lid) openLesson(la.fid,la.lid); }catch(e){}
+      });
+    } else {
+      AUID=null; document.querySelector(".app").hidden=true; $("authView").hidden=false;
+    }
+  });
 })();
 </script>
 </body>
