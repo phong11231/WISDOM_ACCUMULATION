@@ -125,16 +125,15 @@
 <div class="center" id="authView" hidden>
   <div class="authcard">
     <p class="brand">🎬 Học Qua Video</p>
-    <h2>Đăng nhập</h2>
-    <p class="asub">Đăng nhập để lưu khóa học trên tài khoản — mở máy nào cũng thấy.</p>
+    <h2>Vào học</h2>
+    <p class="asub">Nhập <b>email</b> (biết ai học) + <b>mã khóa học</b> (mở đúng khóa). Mã mới sẽ tự tạo khóa mới.</p>
     <div class="aerr" id="aerr"></div>
-    <label for="email">Email</label>
+    <label for="email">Email của bạn</label>
     <input id="email" type="email" autocomplete="username" placeholder="ban@email.com">
-    <label for="pw">Mật khẩu</label>
-    <input id="pw" type="password" autocomplete="current-password" placeholder="ít nhất 6 ký tự">
+    <label for="pw">Mã khóa học</label>
+    <input id="pw" type="text" autocomplete="off" placeholder="VD: c#, c++, react...">
     <div class="arow">
-      <button class="btn primary" id="loginBtn">Đăng nhập</button>
-      <button class="btn" id="signupBtn">Đăng ký</button>
+      <button class="btn primary" id="loginBtn" style="flex:1">Vào học →</button>
     </div>
   </div>
 </div>
@@ -458,21 +457,38 @@
     if(c.indexOf("unauthorized-domain")>=0)return "Tên miền chưa được cấp phép trong Firebase.";
     return (e&&e.message)||"Có lỗi, thử lại.";
   }
-  function doAuth(mode){
-    var em=$("email").value.trim(), pw=$("pw").value, err=$("aerr"); err.textContent="";
-    if(!em||!pw){err.textContent="Nhập email và mật khẩu.";return;}
-    var p=mode==="signup"?fbauth.createUserWithEmailAndPassword(em,pw):fbauth.signInWithEmailAndPassword(em,pw);
-    p.catch(function(e){err.textContent=authErr(e);});
+  var CUR_EMAIL="", CUR_CODE="";
+  function hashS(s){ var h=5381,i; for(i=0;i<(s||"").length;i++){ h=((h<<5)+h+s.charCodeAt(i))>>>0; } return h.toString(36); }
+  function derive(email,code){
+    email=(email||"").trim().toLowerCase(); code=(code||"").trim().toLowerCase();
+    return { e:"c"+hashS("C:"+code)+"u"+hashS("E:"+email)+"@hocvideo.app",
+             p:"hv_"+hashS(email+"||"+code)+"_key26" };
   }
-  $("loginBtn").onclick=function(){doAuth("login");};
-  $("signupBtn").onclick=function(){doAuth("signup");};
-  $("pw").addEventListener("keydown",function(e){if(e.key==="Enter")doAuth("login");});
+  function doLogin(){
+    var email=$("email").value.trim(), code=$("pw").value.trim(), err=$("aerr"); err.textContent="";
+    if(!email||!code){ err.textContent="Nhập email và mã khóa học."; return; }
+    CUR_EMAIL=email; CUR_CODE=code;
+    try{ localStorage.setItem(NS+"lastEmail",email); localStorage.setItem(NS+"lastCode",code); }catch(e){}
+    var d=derive(email,code);
+    fbauth.signInWithEmailAndPassword(d.e,d.p).catch(function(e){
+      var c=(e&&e.code)||"";
+      if(c.indexOf("user-not-found")>=0||c.indexOf("invalid-credential")>=0||c.indexOf("invalid-login")>=0){
+        fbauth.createUserWithEmailAndPassword(d.e,d.p).catch(function(e2){ err.textContent=authErr(e2); });
+      } else { err.textContent=authErr(e); }
+    });
+  }
+  $("loginBtn").onclick=doLogin;
+  $("pw").addEventListener("keydown",function(e){if(e.key==="Enter")doLogin();});
+  try{ var le=localStorage.getItem(NS+"lastEmail"); if(le)$("email").value=le; }catch(e){}
   $("logout").onclick=function(){ try{stopSpeak();stopLoop();}catch(e){} fbauth.signOut(); };
 
   fbauth.onAuthStateChanged(function(user){
     $("loadingView").hidden=true;
     if(user){
-      AUID=user.uid; $("userEmail").textContent=user.email;
+      AUID=user.uid;
+      var de=CUR_EMAIL, dc=CUR_CODE;
+      try{ if(!de)de=localStorage.getItem(NS+"lastEmail")||""; if(!dc)dc=localStorage.getItem(NS+"lastCode")||""; }catch(e){}
+      $("userEmail").textContent=(dc?("📘 "+dc+" · "):"")+de;
       $("authView").hidden=true; document.querySelector(".app").hidden=false;
       loadData().then(function(){
         renderTree();
