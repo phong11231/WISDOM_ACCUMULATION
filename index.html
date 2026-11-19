@@ -294,8 +294,9 @@
   function speakCue(idx){
     var cue=curCues[idx]; if(!cue||!cue.vi)return;
     stopSpeak();
-    var slot=cue.end-cue.start, avail=slot;
-    try{ if(player&&player.getCurrentTime){ var t=player.getCurrentTime(); var rem=cue.end-t; if(rem>0.3 && rem<slot) avail=rem; } }catch(e){}
+    var vrate=1.0; try{ if(player&&player.getPlaybackRate){ vrate=player.getPlaybackRate()||1.0; } }catch(e){}
+    var slot=(cue.end-cue.start)/vrate, avail=slot;   // thời gian THỰC còn lại = giây phụ đề ÷ tốc độ video
+    try{ if(player&&player.getCurrentTime){ var t=player.getCurrentTime(); var rem=(cue.end-t)/vrate; if(rem>0.2 && rem<slot) avail=rem; } }catch(e){}
     var mult=parseFloat($("rate").value)||1.0;
     var a=new Audio(ttsUrl(cue.vi)); curAudio=a;
     a.addEventListener("loadedmetadata",function(){
@@ -315,13 +316,14 @@
     if(!ytReady){pendingVideo=vid;return;}
     if(player){ try{player.loadVideoById(vid); if(dubbingOn)player.mute();}catch(e){} return; }
     player=new YT.Player("player",{videoId:vid,playerVars:{rel:0,modestbranding:1,playsinline:1},
-      events:{onReady:onPReady,onStateChange:onPState}});
+      events:{onReady:onPReady,onStateChange:onPState,onPlaybackRateChange:onPRate}});
   }
   function onPReady(){ if(dubbingOn)player.mute(); try{player.playVideo();}catch(e){} }
   function onPState(ev){
     // 1=playing 2=paused 0=ended 3=buffering
     if(ev.data===2||ev.data===0){ stopSpeak(); lastIdx=-99; }
   }
+  function onPRate(){ stopSpeak(); lastIdx=-99; }  // đổi tốc độ video -> đọc lại câu với tốc độ mới
 
   /* ---------- sync engine ---------- */
   var curCues=[], lastIdx=-1, dubbingOn=true, loopTimer=null;
