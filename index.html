@@ -171,7 +171,7 @@
         <div class="player-wrap"><div id="player"></div></div>
         <div class="toolbar">
           <div class="toggle on" id="dubToggle"><span class="switch"></span><span>Lồng tiếng</span></div>
-          <div class="rate">Tốc độ đọc <input type="range" id="rate" min="0.8" max="1.8" step="0.05" value="1.15"><span id="rateVal">1.15x</span></div>
+          <div class="rate">Chỉnh thêm tốc độ <input type="range" id="rate" min="0.8" max="1.6" step="0.05" value="1.0"><span id="rateVal">1.0x</span></div>
           <span class="rate">🔊 Giọng: Google Tiếng Việt</span>
           <span class="status" id="status"></span>
         </div>
@@ -288,7 +288,24 @@
   function speak(text){
     if(!text)return;
     stopSpeak();
-    try{ var a=new Audio(ttsUrl(text)); a.playbackRate=parseFloat($("rate").value)||1.15; curAudio=a; a.play().catch(function(){}); }catch(e){}
+    try{ var a=new Audio(ttsUrl(text)); a.playbackRate=parseFloat($("rate").value)||1.0; curAudio=a; a.play().catch(function(){}); }catch(e){}
+  }
+  // Đọc câu với tốc độ TỰ CHỈNH để vừa khít khung giờ của câu (không tràn qua câu sau)
+  function speakCue(idx){
+    var cue=curCues[idx]; if(!cue||!cue.vi)return;
+    stopSpeak();
+    var slot=cue.end-cue.start, avail=slot;
+    try{ if(player&&player.getCurrentTime){ var t=player.getCurrentTime(); var rem=cue.end-t; if(rem>0.3 && rem<slot) avail=rem; } }catch(e){}
+    var mult=parseFloat($("rate").value)||1.0;
+    var a=new Audio(ttsUrl(cue.vi)); curAudio=a;
+    a.addEventListener("loadedmetadata",function(){
+      var dur=a.duration, rate=1.0;
+      if(dur && avail>0.3){ rate=dur/(avail*0.95); }     // đủ dài để đọc xong trước khi hết câu (chừa 5%)
+      rate=Math.max(0.85, Math.min(2.6, rate))*mult;      // câu dài → nhanh hơn; câu ngắn → ~bình thường
+      rate=Math.max(0.6, Math.min(3.2, rate));
+      try{ a.playbackRate=rate; }catch(e){}
+    });
+    a.play().catch(function(){});
   }
 
   /* ---------- YouTube player ---------- */
@@ -320,7 +337,7 @@
       if(idx!==lastIdx){
         lastIdx=idx;
         stopSpeak();
-        if(idx>=0){ speak(curCues[idx].vi); renderSub(idx); } else { renderSub(-1); }
+        if(idx>=0){ speakCue(idx); renderSub(idx); } else { renderSub(-1); }
       }
     },150);
   }
