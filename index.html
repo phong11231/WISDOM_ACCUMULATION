@@ -143,6 +143,8 @@
     <span style="font-size:12px;color:var(--faint)">Lồng tiếng Việt tự động từ phụ đề</span>
     <span class="sp"></span>
     <span class="umail" id="userEmail"></span>
+    <span id="pretransStatus" style="font-size:12px;color:var(--muted)"></span>
+    <button class="iconbtn" id="pretransBtn" title="Dịch sẵn tất cả phụ đề (chạy nền)">🌐</button>
     <button class="iconbtn" id="logout" title="Đăng xuất">⎋</button>
     <button class="iconbtn" id="theme" title="Sáng / Tối">☀️</button>
   </header>
@@ -288,6 +290,43 @@
       onP(i+1,cues.length);
       await sleep(70);
     }
+  }
+
+  /* ---------- Dịch sẵn TẤT CẢ phụ đề (chạy nền) ---------- */
+  var ptRunning=false, ptStop=false;
+  async function pretranslateAll(){
+    if(ptRunning){ ptStop=true; return; }
+    ptRunning=true; ptStop=false;
+    var btn=$("pretransBtn"), st=$("pretransStatus");
+    btn.textContent="⏹"; btn.title="Dừng dịch sẵn";
+    var all=[]; data.folders.forEach(function(f){ f.lessons.forEach(function(l){ all.push(l); }); });
+    var total=all.length, done=0, newly=0;
+    for(var i=0;i<all.length;i++){
+      if(ptStop)break;
+      var l=all[i]; done++;
+      st.textContent="Dịch sẵn: "+done+"/"+total;
+      try{
+        var sdoc=await srtRef(l.id).get();
+        if(!sdoc.exists){ continue; }
+        var sd=sdoc.data()||{}; var srt=(sd.srt||"");
+        if(!srt.trim()){ continue; }
+        var cues=parseSRT(srt);
+        if(cues.length===0){ continue; }
+        var existing=sd.cues||[];
+        if(existing.length===cues.length){ for(var k=0;k<cues.length;k++){ if(existing[k].vi) cues[k].vi=existing[k].vi; } }
+        if(!cues.some(function(c){return !c.vi;})){ continue; } // da dich day du -> bo qua
+        st.textContent="Dịch sẵn: "+done+"/"+total+" — "+l.name;
+        await translateCues(cues,function(){});
+        if(ptStop)break;
+        await srtRef(l.id).set({srt:srt, cues:cues.map(function(c){return {start:c.start,end:c.end,en:c.en,vi:c.vi};})});
+        newly++;
+        await sleep(300);
+      }catch(e){ console.warn("pretrans",e); }
+    }
+    st.textContent=(ptStop?"Đã dừng":"Xong")+" — dịch mới "+newly+" bài";
+    btn.textContent="🌐"; btn.title="Dịch sẵn tất cả phụ đề (chạy nền)";
+    ptRunning=false;
+    setTimeout(function(){ if(!ptRunning) st.textContent=""; }, 8000);
   }
 
   /* ---------- TTS: Google Translate TTS (giọng Việt thật, free, không cần cài) ---------- */
@@ -518,6 +557,7 @@
   $("pw").addEventListener("keydown",function(e){if(e.key==="Enter")doLogin();});
   try{ var le=localStorage.getItem(NS+"lastEmail"); if(le)$("email").value=le; }catch(e){}
   $("logout").onclick=function(){ try{stopSpeak();stopLoop();}catch(e){} fbauth.signOut(); };
+  $("pretransBtn").onclick=pretranslateAll;
 
   fbauth.onAuthStateChanged(function(user){
     $("loadingView").hidden=true;
