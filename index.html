@@ -344,15 +344,20 @@
     var cue=curCues[idx]; if(!cue||!cue.vi)return;
     stopSpeak();
     var vrate=1.0; try{ if(player&&player.getPlaybackRate){ vrate=player.getPlaybackRate()||1.0; } }catch(e){}
-    var slot=(cue.end-cue.start)/vrate, avail=slot;   // thời gian THỰC còn lại = giây phụ đề ÷ tốc độ video
-    try{ if(player&&player.getCurrentTime){ var t=player.getCurrentTime(); var rem=(cue.end-t)/vrate; if(rem>0.2 && rem<slot) avail=rem; } }catch(e){}
+    // Mốc kết thúc = lúc câu KẾ TIẾP bắt đầu (tận dụng cả khoảng lặng để đọc hết câu dài)
+    var next=curCues[idx+1];
+    var endBound=next ? Math.max(next.start, cue.end) : (cue.end+1.5);
+    var nowT=cue.start;
+    try{ if(player&&player.getCurrentTime){ var t=player.getCurrentTime(); if(t>cue.start-0.3 && t<endBound) nowT=t; } }catch(e){}
+    var avail=(endBound-nowT)/vrate;   // thời gian THỰC còn lại (đã tính tốc độ video) đến câu kế tiếp
     var mult=parseFloat($("rate").value)||1.0;
     var a=new Audio(ttsUrl(cue.vi)); curAudio=a;
     a.addEventListener("loadedmetadata",function(){
-      var dur=a.duration, rate=1.0;
-      if(dur && avail>0.3){ rate=dur/(avail*0.95); }     // đủ dài để đọc xong trước khi hết câu (chừa 5%)
-      rate=Math.max(0.85, Math.min(2.6, rate))*mult;      // câu dài → nhanh hơn; câu ngắn → ~bình thường
-      rate=Math.max(0.6, Math.min(3.2, rate));
+      var dur=a.duration||0, rate=1.0;
+      if(dur>0 && avail>0.25){ rate=dur/(avail*0.97); }   // phải đọc xong trong ~97% thời gian có sẵn
+      rate=Math.max(1.0, rate);     // câu NGẮN → đọc bình thường (xong sớm), không kéo dài
+      rate=rate*mult;               // người dùng chỉnh thêm tốc độ
+      rate=Math.max(0.7, Math.min(4.0, rate));  // câu DÀI → nhanh hơn, tối đa 4x để vẫn kịp
       try{ a.playbackRate=rate; }catch(e){}
     });
     a.play().catch(function(){});
@@ -387,8 +392,8 @@
       var idx=cueIndexAt(t);
       if(idx!==lastIdx){
         lastIdx=idx;
-        stopSpeak();
-        if(idx>=0){ speakCue(idx); renderSub(idx); } else { renderSub(-1); }
+        if(idx>=0){ stopSpeak(); speakCue(idx); renderSub(idx); }
+        else { renderSub(-1); }   // khoang lang: KHONG cat audio, de doc not cau tieng Viet
       }
     },150);
   }
