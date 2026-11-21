@@ -221,15 +221,25 @@
   firebase.initializeApp(firebaseConfig);
   var fbauth=firebase.auth(), db=firebase.firestore(), AUID=null;
   function docRef(){ return db.collection("users").doc(AUID).collection("app").doc("courses"); }
+  function srtRef(lid){ return db.collection("users").doc(AUID).collection("srt").doc(lid); }
 
   /* ---------- data ---------- */
   var data={folders:[]};
   var saveTimer;
-  function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(function(){ if(!AUID)return; docRef().set({folders:data.folders}).catch(function(e){console.error("save",e);}); },500); }
+  // Doc chinh chi luu CAU TRUC (khong srt/cues) de khong dung gioi han 1MB cua Firestore
+  function slimFolders(){
+    return data.folders.map(function(f){
+      return {id:f.id,name:f.name,collapsed:f.collapsed,_ch:f._ch,
+        lessons:f.lessons.map(function(l){return {id:l.id,name:l.name,url:l.url,videoId:l.videoId,_ch:l._ch,_ls:l._ls};})};
+    });
+  }
+  function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(function(){ if(!AUID)return; docRef().set({folders:slimFolders()}).catch(function(e){console.error("save",e);}); },500); }
+  // srt + cues cua moi bai luu rieng o users/{uid}/srt/{lessonId}
+  function saveSrt(l){ if(!AUID||!l||!l.id)return; srtRef(l.id).set({srt:l.srt||"",cues:l.cues||[]}).catch(function(e){console.error("saveSrt",e);}); }
   function loadData(){
     return docRef().get().then(function(s){
       if(s.exists && s.data().folders){ data={folders:s.data().folders}; return; }
-      try{ var r=localStorage.getItem(NS+"data"); if(r){ var d=JSON.parse(r); if(d&&d.folders&&d.folders.length){ data=d; docRef().set({folders:data.folders}); return; } } }catch(e){}
+      try{ var r=localStorage.getItem(NS+"data"); if(r){ var d=JSON.parse(r); if(d&&d.folders&&d.folders.length){ data=d; docRef().set({folders:slimFolders()}); return; } } }catch(e){}
       data={folders:[]};
     }).catch(function(e){ console.warn("load",e); data={folders:[]}; });
   }
@@ -381,6 +391,13 @@
     if(!vid){ setStatus("⚠️ Link YouTube không hợp lệ"); return; }
     createPlayer(vid);
 
+    // Tai srt/cues cua bai tu doc rieng (users/{uid}/srt/{lessonId})
+    if(lesson.srt===undefined){
+      setStatus("Đang tải phụ đề…");
+      try{ var sdoc=await srtRef(lesson.id).get(); if(sdoc.exists){ lesson.srt=sdoc.data().srt||""; lesson.cues=sdoc.data().cues||[]; } else { lesson.srt=""; } }
+      catch(e){ lesson.srt=lesson.srt||""; }
+    }
+
     curCues=parseSRT(lesson.srt||"");
     if(curCues.length===0){ setStatus("⚠️ Không có phụ đề — chỉ xem video"); return; }
 
@@ -393,7 +410,7 @@
       setStatus("Đang dịch…",0,curCues.length);
       await translateCues(curCues,function(cur,total){ setStatus("Đang dịch…",cur,total); });
       lesson.cues=curCues.map(function(c){return {start:c.start,end:c.end,en:c.en,vi:c.vi};});
-      save();
+      saveSrt(lesson);
     }
     setStatus("✅ Sẵn sàng — đang lồng tiếng");
     if(dubbingOn&&player&&player.mute)player.mute();
@@ -452,9 +469,10 @@
       await translateCues(cues,function(cur,total){ btn.textContent="Đang dịch… "+cur+"/"+total; });
       btn.disabled=false; $("mCancel").disabled=false; btn.textContent="Thêm bài";
     }
-    folder.lessons.push({id:uid(),name:name,url:url,videoId:vid,srt:srt,
-      cues:cues.map(function(c){return {start:c.start,end:c.end,en:c.en,vi:c.vi};})});
-    save(); renderTree(); $("lessonModal").hidden=true;
+    var nl={id:uid(),name:name,url:url,videoId:vid,srt:srt,
+      cues:cues.map(function(c){return {start:c.start,end:c.end,en:c.en,vi:c.vi};})};
+    folder.lessons.push(nl);
+    saveSrt(nl); save(); renderTree(); $("lessonModal").hidden=true;
   };
 
   /* ---------- export / import ---------- */
