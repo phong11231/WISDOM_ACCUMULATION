@@ -73,8 +73,19 @@
   .lesson{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px}
   .lesson:hover{background:var(--accent-soft)}
   .lesson.active{background:var(--accent);color:#fff}
-  .lesson .dot{width:7px;height:7px;border-radius:50%;background:var(--good);flex:none}
+  .lesson .tick{width:17px;height:17px;border-radius:50%;border:2px solid var(--border-strong);flex:none;cursor:pointer;display:grid;place-items:center;transition:all .15s}
+  .lesson .tick:hover{border-color:var(--good);transform:scale(1.12)}
+  .lesson .tick.done{background:var(--good);border-color:var(--good)}
+  .lesson .tick.done::after{content:"✓";color:#fff;font-size:11px;font-weight:900;line-height:1}
+  .lesson.active .tick{border-color:rgba(255,255,255,.6)}
   .lesson .lname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lesson .lname.done{text-decoration:line-through;color:var(--faint);opacity:.8}
+  .lesson.active .lname.done{color:rgba(255,255,255,.75)}
+  .fname-t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .folder-head .fcount{color:var(--good)!important;font-weight:700;font-size:11.5px}
+  .fprog{height:4px;background:var(--surface-2);border-radius:999px;margin:0 11px 7px;overflow:hidden}
+  .fprog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--good),var(--accent));transition:width .35s}
+  .folder.done-all{border-color:var(--good)}
   .lesson .x{opacity:0;border:none;background:none;color:inherit;cursor:pointer;font-size:13px}
   .lesson:hover .x{opacity:.7}
   .addbtn{margin-top:4px}
@@ -232,7 +243,7 @@
   function slimFolders(){
     return data.folders.map(function(f){
       return {id:f.id,name:f.name,collapsed:f.collapsed,_ch:f._ch,
-        lessons:f.lessons.map(function(l){return {id:l.id,name:l.name,url:l.url,videoId:l.videoId,_ch:l._ch,_ls:l._ls};})};
+        lessons:f.lessons.map(function(l){return {id:l.id,name:l.name,url:l.url,videoId:l.videoId,_ch:l._ch,_ls:l._ls,done:!!l.done};})};
     });
   }
   function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(function(){ if(!AUID)return; docRef().set({folders:slimFolders()}).catch(function(e){console.error("save",e);}); },500); }
@@ -376,6 +387,14 @@
   function onPState(ev){
     // 1=playing 2=paused 0=ended 3=buffering
     if(ev.data===2||ev.data===0){ stopSpeak(); lastIdx=-99; }
+    if(ev.data===0 && activeLesson){ setDone(activeLesson.fid,activeLesson.lid,true); }  // xem het -> tu danh dau da hoc
+  }
+  // Danh dau bai da hoc xong / chua hoc
+  function setDone(fid,lid,val){
+    var f=data.folders.find(function(x){return x.id===fid;}); if(!f)return;
+    var l=f.lessons.find(function(x){return x.id===lid;}); if(!l)return;
+    if(!!l.done===!!val) return;
+    l.done=!!val; save(); renderTree();
   }
   function onPRate(){ stopSpeak(); lastIdx=-99; }  // đổi tốc độ video -> đọc lại câu với tốc độ mới
 
@@ -469,16 +488,20 @@
     data.folders.forEach(function(f){
       var fo=document.createElement("div"); fo.className="folder"+(f.collapsed?" collapsed":"");
       var fh=document.createElement("div"); fh.className="folder-head";
-      fh.innerHTML='<span class="caret">▼</span><span>📁 '+esc(f.name)+'</span><span class="fcount">('+f.lessons.length+')</span><button class="x" title="Xóa thư mục">✕</button>';
+      var dn=f.lessons.filter(function(l){return l.done;}).length, tot=f.lessons.length, pct=tot?Math.round(dn/tot*100):0;
+      if(tot&&dn===tot) fo.classList.add("done-all");
+      fh.innerHTML='<span class="caret">▼</span><span class="fname-t">📁 '+esc(f.name)+'</span><span class="fcount">'+dn+'/'+tot+'</span><button class="x" title="Xóa thư mục">✕</button>';
       fh.onclick=function(ev){ if(ev.target.classList.contains("x"))return; f.collapsed=!f.collapsed; save(); renderTree(); };
       fh.querySelector(".x").onclick=function(ev){ ev.stopPropagation(); if(confirm('Xóa thư mục "'+f.name+'" và tất cả bài trong đó?')){ data.folders=data.folders.filter(function(x){return x!==f;}); save(); renderTree(); } };
       fo.appendChild(fh);
+      var pb=document.createElement("div"); pb.className="fprog"; pb.innerHTML='<i style="width:'+pct+'%"></i>'; fo.appendChild(pb);
       var ls=document.createElement("div"); ls.className="lessons";
       f.lessons.forEach(function(l){
         var le=document.createElement("div");
         le.className="lesson"+(activeLesson&&activeLesson.fid===f.id&&activeLesson.lid===l.id?" active":"");
-        le.innerHTML='<span class="dot"></span><span class="lname">'+esc(l.name)+'</span><button class="x" title="Xóa bài">✕</button>';
-        le.onclick=function(ev){ if(ev.target.classList.contains("x"))return; openLesson(f.id,l.id); };
+        le.innerHTML='<span class="tick'+(l.done?' done':'')+'" title="Đánh dấu đã học xong"></span><span class="lname'+(l.done?' done':'')+'">'+esc(l.name)+'</span><button class="x" title="Xóa bài">✕</button>';
+        le.onclick=function(ev){ if(ev.target.classList.contains("x")||ev.target.classList.contains("tick"))return; openLesson(f.id,l.id); };
+        le.querySelector(".tick").onclick=function(ev){ ev.stopPropagation(); setDone(f.id,l.id,!l.done); };
         le.querySelector(".x").onclick=function(ev){ ev.stopPropagation(); if(confirm('Xóa bài "'+l.name+'"?')){ f.lessons=f.lessons.filter(function(x){return x!==l;}); save(); renderTree(); } };
         ls.appendChild(le);
       });
