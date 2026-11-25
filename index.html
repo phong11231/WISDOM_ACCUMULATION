@@ -514,6 +514,37 @@
     saveSrt(l);
     openLesson(activeLesson.fid,activeLesson.lid);
   }
+  // Khi mở app: tự dò các bài CHƯA HỌC bị lỗi dịch -> dịch lại nền (bỏ qua bài đã dịch tốt + bài đã học)
+  async function autoFixUnlearned(){
+    if(ptRunning)return;
+    ptRunning=true; ptStop=false;
+    var st=$("pretransStatus"); var fixed=0;
+    var all=[]; data.folders.forEach(function(f){ f.lessons.forEach(function(l){ if(!l.done) all.push(l); }); });
+    for(var i=0;i<all.length;i++){
+      if(ptStop)break;
+      var l=all[i];
+      try{
+        var sdoc=await srtRef(l.id).get();
+        if(!sdoc.exists)continue;
+        var sd=sdoc.data()||{}; var srt=(sd.srt||"");
+        if(!srt.trim())continue;
+        var cues=parseSRT(srt); if(cues.length===0)continue;
+        var existing=sd.cues||[];
+        if(existing.length===cues.length){ for(var k=0;k<cues.length;k++){ if(existing[k].vi) cues[k].vi=existing[k].vi; } }
+        var bad=0; cues.forEach(function(c){ if(isBadVi(c)){ c.vi=""; bad++; } });
+        if(bad===0)continue;   // không câu lỗi -> bỏ qua (nhanh)
+        st.textContent="Tự sửa dịch: "+l.name+" ("+bad+" câu lỗi)";
+        await translateCues(cues,function(){});
+        if(ptStop)break;
+        await srtRef(l.id).set({srt:srt, cues:cues.map(function(c){return {start:c.start,end:c.end,en:c.en,vi:c.vi};})});
+        if(activeLesson && activeLesson.lid===l.id && curCues.length===cues.length){ for(var m=0;m<curCues.length;m++){ curCues[m].vi=cues[m].vi; } lastIdx=-99; }
+        fixed++; await sleep(300);
+      }catch(e){ console.warn("autofix",e); }
+    }
+    st.textContent=fixed? ("✅ Tự sửa dịch xong "+fixed+" bài") : "";
+    ptRunning=false;
+    setTimeout(function(){ if(!ptRunning) st.textContent=""; }, 8000);
+  }
 
   /* ---------- render tree ---------- */
   function renderTree(){
@@ -635,6 +666,7 @@
       loadData().then(function(){
         renderTree();
         try{ var la=JSON.parse(localStorage.getItem(NS+"active")||"null"); if(la&&la.fid&&la.lid) openLesson(la.fid,la.lid); }catch(e){}
+        setTimeout(function(){ autoFixUnlearned(); }, 2500);  // tự sửa dịch bài chưa học bị lỗi (chạy nền)
       });
     } else {
       AUID=null; document.querySelector(".app").hidden=true; $("authView").hidden=false;
